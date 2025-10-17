@@ -30,7 +30,7 @@ services:
       - DB_USERNAME=sevima_user
       - DB_PASSWORD=sevima12345
     volumes:
-      - ./php:/var/www/html
+      - ./php:/var/www/html:delegated
       - /var/www/html/vendor
     ports:
       - "9000:9000"
