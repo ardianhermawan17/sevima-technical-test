@@ -6,7 +6,7 @@ class CryptoManager
     private $pdo;
     private $institutionId;
 
-    public function __construct(PDO $pdo, string $institutionId)
+    public function __construct(\PDO $pdo, string $institutionId)
     {
         $this->pdo = $pdo;
         $this->institutionId = $institutionId;
