@@ -46,6 +46,7 @@ pipeline {
     DOCKER_HUB_AUTH = credentials('docker-ardian-read-write')
     LABEL_APP       = 'sevima-technical-test-core-php'
     DEPLOYMENT_NAME = 'sevima-technical-test-core-php'
+    SUB_DIR         = 'php'
   }
 
   stages {
@@ -55,60 +56,75 @@ pipeline {
       }
     }
 
+    stage('Verify Sub Directory') {
+      steps {
+        script {
+          if (!fileExists("${env.SUB_DIR}")) {
+            error("Sub directory '${env.SUB_DIR}' not found after checkout. Please verify repository structure.")
+          }
+          echo "Found sub directory at: ${env.WORKSPACE}/${env.SUB_DIR}"
+        }
+      }
+    }
+
     stage('Load Secrets from Kubernetes') {
       steps {
-        container('kubectl') {
-         withKubeConfig([credentialsId: env.KUBECONFIG_CRED]) {
-           sh '''
-                 set -eu
-                 SECRET_NAME=core-php-sevima-technical-test-env
-                 OUT=/tmp/core-php.env
-                 : > "$OUT"
+        dir("${env.SUB_DIR}") {
+          container('kubectl') {
+            withKubeConfig([credentialsId: env.KUBECONFIG_CRED]) {
+              sh '''
+                set -eu
+                SECRET_NAME=core-php-sevima-technical-test-env
+                OUT=/tmp/core-php.env
+                : > "$OUT"
 
-                 # list ENV for PHP app
-                 keys="APP_NAME APP_ENV APP_DEBUG PORT DB_CONNECTION DB_HOST DB_PORT DB_DATABASE DB_USERNAME DB_PASSWORD INSTITUTION_ID"
+                # list ENV for PHP app
+                keys="APP_NAME APP_ENV APP_DEBUG PORT DB_CONNECTION DB_HOST DB_PORT DB_DATABASE DB_USERNAME DB_PASSWORD INSTITUTION_ID"
 
-                 for k in $keys; do
-                   val=$(kubectl -n ${K8S_NAMESPACE} get secret "$SECRET_NAME" -o "jsonpath={.data.${k}}" 2>/dev/null || true)
-                   if [ -n "$val" ]; then
-                     # decode and append
-                     echo "${k}=$(echo $val | base64 -d)" >> "$OUT"
-                   fi
-                 done
+                for k in $keys; do
+                  val=$(kubectl -n ${K8S_NAMESPACE} get secret "$SECRET_NAME" -o "jsonpath={.data.${k}}" 2>/dev/null || true)
+                  if [ -n "$val" ]; then
+                    # decode and append
+                    echo "${k}=$(echo $val | base64 -d)" >> "$OUT"
+                  fi
+                done
 
-                 echo "Wrote core-php secret partial to $OUT (if any keys found)"
-               '''
-           }
+                echo "Wrote core-php secret partial to $OUT (if any keys found)"
+              '''
+            }
+          }
         }
       }
     }
 
     stage('Setup Docker Config Secret') {
       steps {
-        container('kubectl') {
-          withCredentials([usernamePassword(credentialsId: 'docker-ardian-read-write',
+        dir("${env.SUB_DIR}") {
+          container('kubectl') {
+            withCredentials([usernamePassword(credentialsId: 'docker-ardian-read-write',
                                             usernameVariable: 'DOCKER_USER',
                                             passwordVariable: 'DOCKER_PASS')]) {
-            withKubeConfig([credentialsId: env.KUBECONFIG_CRED]) {
-              sh '''
-                set -e
+              withKubeConfig([credentialsId: env.KUBECONFIG_CRED]) {
+                sh '''
+                  set -e
 
-                AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64 | tr -d '\\n')
+                  AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64 | tr -d '\\n')
 
-                cat > config.json <<EOF
-                {
-                  "auths": {
-                    "https://index.docker.io/v1/": {
-                      "auth": "$AUTH"
+                  cat > config.json <<EOF
+                  {
+                    "auths": {
+                      "https://index.docker.io/v1/": {
+                        "auth": "$AUTH"
+                      }
                     }
                   }
-                }
-                EOF
+                  EOF
 
-                kubectl -n jenkins delete secret docker-config --ignore-not-found
-                kubectl -n jenkins create secret generic docker-config \
-                  --from-file=config.json=./config.json
-              '''
+                  kubectl -n jenkins delete secret docker-config --ignore-not-found
+                  kubectl -n jenkins create secret generic docker-config \
+                    --from-file=config.json=./config.json
+                '''
+              }
             }
           }
         }
@@ -117,47 +133,53 @@ pipeline {
 
     stage('Build & Push Image with BuildKit') {
       steps {
-        container('buildkit') {
-          sh '''
-            ls -la ${WORKSPACE}
+        dir("${env.SUB_DIR}") {
+          container('buildkit') {
+            sh '''
+              ls -la
 
-            buildctl-daemonless.sh build \
-              --frontend dockerfile.v0 \
-              --local context=${WORKSPACE} \
-              --local dockerfile=${WORKSPACE} \
-              --output type=image,name=${IMAGE}:${BUILD_ID},push=true \
-              --output type=image,name=${IMAGE}:latest,push=true \
-              --opt build-arg:CI=false
-          '''
+              buildctl-daemonless.sh build \
+                --frontend dockerfile.v0 \
+                --local context=. \
+                --local dockerfile=. \
+                --output type=image,name=${IMAGE}:${BUILD_ID},push=true \
+                --output type=image,name=${IMAGE}:latest,push=true \
+                --opt build-arg:CI=false
+            '''
+          }
         }
       }
     }
 
     stage('Update Kubernetes Manifests') {
       steps {
-        sh '''
-          sed -i "s|docker.io/ardianhermawan17/core-php-sevima-technical-test:latest|${IMAGE}:${BUILD_ID}|g" config/k8s/deploy-core-php-sevima-k8s.yaml
-        '''
+        dir("${env.SUB_DIR}") {
+          sh '''
+            sed -i "s|docker.io/ardianhermawan17/core-php-sevima-technical-test:latest|${IMAGE}:${BUILD_ID}|g" config/k8s/deploy-core-php-sevima-k8s.yaml
+          '''
+        }
       }
     }
 
     stage('Deploy to kubernetes') {
       steps {
-        container('kubectl') {
-          withKubeConfig([credentialsId: env.KUBECONFIG_CRED]) {
-            sh '''
-                  set -eu
-                  # Replace BUILD_ID_PLACEHOLDER with build id in template labels
-                  sed -i "s|BUILD_ID_PLACEHOLDER|${BUILD_ID}|g" config/k8s/deploy-core-php-sevima-k8s.yaml || true
+        dir("${env.SUB_DIR}") {
+          container('kubectl') {
+            withKubeConfig([credentialsId: env.KUBECONFIG_CRED]) {
+              sh '''
+                set -eu
+                # Replace BUILD_ID_PLACEHOLDER with build id in template labels
+                sed -i "s|BUILD_ID_PLACEHOLDER|${BUILD_ID}|g" config/k8s/deploy-core-php-sevima-k8s.yaml || true
 
-                  # Make sure image is replaced in manifest
-                  sed -i "s|docker.io/ardianhermawan17/core-php-sevima-technical-test:latest|${IMAGE}:${BUILD_ID}|g" config/k8s/deploy-core-php-sevima-k8s.yaml || true
+                # Make sure image is replaced in manifest
+                sed -i "s|docker.io/ardianhermawan17/core-php-sevima-technical-test:latest|${IMAGE}:${BUILD_ID}|g" config/k8s/deploy-core-php-sevima-k8s.yaml || true
 
-                  # Apply and capture applied names
-                  kubectl apply -n ${K8S_NAMESPACE} -f config/k8s/deploy-core-php-sevima-k8s.yaml -o name > ${WORKSPACE}/applied.txt
-                  echo "Applied:"
-                  cat ${WORKSPACE}/applied.txt || true
-                '''
+                # Apply and capture applied names
+                kubectl apply -n ${K8S_NAMESPACE} -f config/k8s/deploy-core-php-sevima-k8s.yaml -o name > ${WORKSPACE}/applied.txt
+                echo "Applied:"
+                cat ${WORKSPACE}/applied.txt || true
+              '''
+            }
           }
         }
       }
@@ -165,12 +187,14 @@ pipeline {
 
     stage('Apply Ingress') {
       steps {
-        container('kubectl') {
-          withKubeConfig([credentialsId: env.KUBECONFIG_CRED]) {
-            sh '''
-                  set -eu
-                  kubectl apply -n ${K8S_NAMESPACE} -f config/k8s/ingress-core-php-k8s.yaml || true
-                '''
+        dir("${env.SUB_DIR}") {
+          container('kubectl') {
+            withKubeConfig([credentialsId: env.KUBECONFIG_CRED]) {
+              sh '''
+                set -eu
+                kubectl apply -n ${K8S_NAMESPACE} -f config/k8s/ingress-core-php-k8s.yaml || true
+              '''
+            }
           }
         }
       }
@@ -178,14 +202,16 @@ pipeline {
 
     stage('Verify Deployment') {
       steps {
-        container('kubectl') {
-          withKubeConfig([credentialsId: env.KUBECONFIG_CRED]) {
-            sh '''
+        dir("${env.SUB_DIR}") {
+          container('kubectl') {
+            withKubeConfig([credentialsId: env.KUBECONFIG_CRED]) {
+              sh '''
                 set -eu
                 kubectl -n ${K8S_NAMESPACE} wait deployment/${DEPLOYMENT_NAME} --for=condition=available --timeout=300s
                 kubectl -n ${K8S_NAMESPACE} get pods -l app=${LABEL_APP} -o wide
                 kubectl -n ${K8S_NAMESPACE} rollout status deployment/${DEPLOYMENT_NAME} --timeout=300s || echo "Rollout status check timed out, but deployment may already be available"
-               '''
+              '''
+            }
           }
         }
       }
@@ -198,6 +224,7 @@ pipeline {
     }
     failure {
       echo 'Pipeline failed! Attempting safe rollback/cleanup...'
+      dir("${env.SUB_DIR}") {
         container('kubectl') {
           withKubeConfig([credentialsId: env.KUBECONFIG_CRED]) {
             sh '''
@@ -228,6 +255,7 @@ pipeline {
             '''
           }
         }
+      }
     }
     always {
       echo 'Pipeline execution completed.'
