@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sevima-technical-test-core-php
+  namespace: sevima
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: sevima-core-php-soal-1.radiodiagnosis.id
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sevima-technical-test-core-php-service
+                port:
+                  number: 9000
+  tls:
+    - hosts:
+        - sevima-core-php-soal-1.radiodiagnosis.id
+      secretName: core-php-sevima-technical-test-tls

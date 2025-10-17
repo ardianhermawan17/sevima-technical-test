@@ -1,0 +1,63 @@
+version: '3.8'
+name: 'sevima-test-soal-1'
+
+services:
+  node-app:
+    build: ./nodejs
+    container_name: siakad-verification-api
+    restart: unless-stopped
+    env_file:
+      - ./nodejs/.env
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+    networks:
+      - sevima-network
+  app:
+    build:
+      context: ./php
+      target: runtime
+    container_name: sevima-soal1-app
+    restart: unless-stopped
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=sevima_bagian_i_soal_1
+      - DB_USERNAME=sevima_user
+      - DB_PASSWORD=sevima12345
+    volumes:
+      - ./php:/var/www/html
+      - /var/www/html/vendor
+    ports:
+      - "9000:9000"
+    depends_on:
+      - postgres
+    networks:
+      - sevima-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: sevima-soal1-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sevima_bagian_i_soal_1
+      POSTGRES_USER: sevima_user
+      POSTGRES_PASSWORD: sevima12345
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./php/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "30432:5432"
+    networks:
+      - sevima-network
+
+networks:
+  sevima-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

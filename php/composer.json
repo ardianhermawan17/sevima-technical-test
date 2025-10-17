@@ -1,0 +1,52 @@
+{
+  "$schema": "https://getcomposer.org/schema.json",
+  "name": "sevima/bagian-i-soal-i",
+  "type": "project",
+  "description": "Ini untuk ujicoba metode Arbitrary-Precision Libraries untuk menghindari fraud graduation detection di siakad",
+  "keywords": ["sevima", "ardian", "siakad", "cryptographic", "transcript", "verification"],
+  "license": "MIT",
+  "require": {
+    "php": "^8.4",
+    "ext-pdo": "*",
+    "ext-pdo_pgsql": "*",
+    "ext-json": "*",
+    "ext-openssl": "*",
+    "ext-gmp": "*"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.5",
+    "fakerphp/faker": "^1.23"
+  },
+  "autoload": {
+    "psr-4": {
+      "core\\": "core/",
+      "services\\": "services/"
+    },
+    "files": [
+      "utils/helpers.php"
+    ]
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
+    }
+  },
+  "config": {
+    "allow-plugins": {
+      "composer/installers": true
+    },
+    "optimize-autoloader": true,
+    "preferred-install": "dist",
+    "sort-packages": true
+  },
+  "scripts": {
+    "test": "phpunit",
+    "test-coverage": "phpunit --coverage-html coverage"
+  },
+  "support": {
+    "issues": "https://github.com/ardianhermawan17/sevima-technical-test/issues",
+    "source": "https://github.com/ardianhermawan17/sevima-technical-test"
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}

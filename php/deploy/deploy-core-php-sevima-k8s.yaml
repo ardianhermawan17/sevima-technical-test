@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: core-php-sevima-technical-test-env
+  namespace: sevima
+  labels:
+    app: sevima-technical-test-core-php
+data:
+  APP_NAME: dHJhbnNjcmlwdC12ZXJpZmljYXRpb24tc2VydmljZQ==
+  APP_ENV: bG9jYWw=
+  APP_DEBUG: dHJ1ZQ==
+  PORT: MzAwMA==
+  DB_CONNECTION: cG9zdGdyZXM=
+  DB_HOST: c2lha2FkLWRi
+  DB_PORT: MzA0MzI=
+  DB_DATABASE: c2V2aW1hX2JhZ2lhbl9pX3NvYWxfMQ==
+  DB_USERNAME: c2V2aW1hX3VzZXI=
+  DB_PASSWORD: c2V2aW1hMTIzNDU=
+  INSTITUTION_ID: VU5JVkVSU0lUQVMtSU5ET05FU0lB
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sevima-technical-test-core-php
+  namespace: sevima
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sevima-technical-test-core-php
+  template:
+    metadata:
+      labels:
+        app: sevima-technical-test-core-php
+        build-id: "BUILD_ID_PLACEHOLDER"
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: rke2-agent-node-3
+      containers:
+        - name: sevima-technical-test-core-php
+          image: docker.io/ardianhermawan17/core-php-sevima-technical-test:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9000
+          envFrom:
+            - secretRef:
+                name: core-php-sevima-technical-test-env
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "250m"
+              memory: "512Mi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 9000
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 6
+            successThreshold: 1
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9000
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sevima-technical-test-core-php-service
+  namespace: sevima
+spec:
+  selector:
+    app: sevima-technical-test-core-php
+  ports:
+    - port: 9000
+      targetPort: 9000
