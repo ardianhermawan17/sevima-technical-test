@@ -192,7 +192,7 @@ pipeline {
             withKubeConfig([credentialsId: env.KUBECONFIG_CRED]) {
               sh '''
                 set -eu
-                kubectl apply -n ${K8S_NAMESPACE} -f deploy/k8s/ingress-core-php-k8s.yaml || true
+                kubectl apply -n ${K8S_NAMESPACE} -f deploy/k8s/ingress-core-php-sevima-k8s.yaml || true
               '''
             }
           }
