@@ -155,7 +155,7 @@ pipeline {
       steps {
         dir("${env.SUB_DIR}") {
           sh '''
-            sed -i "s|docker.io/ardianhermawan17/core-php-sevima-technical-test:latest|${IMAGE}:${BUILD_ID}|g" config/k8s/deploy-core-php-sevima-k8s.yaml
+            sed -i "s|docker.io/ardianhermawan17/core-php-sevima-technical-test:latest|${IMAGE}:${BUILD_ID}|g" deploy/k8s/deploy-core-php-sevima-k8s.yaml
           '''
         }
       }
@@ -169,13 +169,13 @@ pipeline {
               sh '''
                 set -eu
                 # Replace BUILD_ID_PLACEHOLDER with build id in template labels
-                sed -i "s|BUILD_ID_PLACEHOLDER|${BUILD_ID}|g" config/k8s/deploy-core-php-sevima-k8s.yaml || true
+                sed -i "s|BUILD_ID_PLACEHOLDER|${BUILD_ID}|g" deploy/k8s/deploy-core-php-sevima-k8s.yaml || true
 
                 # Make sure image is replaced in manifest
-                sed -i "s|docker.io/ardianhermawan17/core-php-sevima-technical-test:latest|${IMAGE}:${BUILD_ID}|g" config/k8s/deploy-core-php-sevima-k8s.yaml || true
+                sed -i "s|docker.io/ardianhermawan17/core-php-sevima-technical-test:latest|${IMAGE}:${BUILD_ID}|g" deploy/k8s/deploy-core-php-sevima-k8s.yaml || true
 
                 # Apply and capture applied names
-                kubectl apply -n ${K8S_NAMESPACE} -f config/k8s/deploy-core-php-sevima-k8s.yaml -o name > ${WORKSPACE}/applied.txt
+                kubectl apply -n ${K8S_NAMESPACE} -f deploy/k8s/deploy-core-php-sevima-k8s.yaml -o name > ${WORKSPACE}/applied.txt
                 echo "Applied:"
                 cat ${WORKSPACE}/applied.txt || true
               '''
@@ -192,7 +192,7 @@ pipeline {
             withKubeConfig([credentialsId: env.KUBECONFIG_CRED]) {
               sh '''
                 set -eu
-                kubectl apply -n ${K8S_NAMESPACE} -f config/k8s/ingress-core-php-k8s.yaml || true
+                kubectl apply -n ${K8S_NAMESPACE} -f deploy/k8s/ingress-core-php-k8s.yaml || true
               '''
             }
           }
