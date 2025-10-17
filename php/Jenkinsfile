@@ -19,7 +19,7 @@ pipeline {
                 - name: docker-config
                   mountPath: /root/.docker
             - name: kubectl
-              image: bitnami/kubectl:1.30
+              image: bitnami/kubectl:latest
               command: ["sleep","infinity"]
               tty: true
               securityContext:
