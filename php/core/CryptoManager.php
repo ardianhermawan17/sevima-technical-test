@@ -24,25 +24,25 @@ class CryptoManager
         ];
 
         $resource = openssl_pkey_new($config);
-        openssl_pkey_export($resource, $privateKey, null, $config);
-
+        openssl_pkey_export($resource, $privateKeyPem); // Export private key PEM
         $details = openssl_pkey_get_details($resource);
-        $publicKey = $details['key'];
+        $publicKeyPem = $details['key']; // Public key PEM
 
-        // Store as big-endian binary (native database storage)
-        $privateBin = openssl_pkey_get_private($privateKey);
-        $publicBin = openssl_get_publickey($publicKey);
-
-        $stmt = $this->pdo->prepare(
-            "INSERT INTO academic_keys (institution_id, private_key, public_key) 
-            VALUES (?, ?, ?)"
-        );
+        $stmt = $this->pdo->prepare("
+            INSERT INTO academic_keys (institution_id, private_key, public_key)
+            VALUES (?, ?, ?)
+            ON CONFLICT (institution_id) DO UPDATE
+            SET private_key = EXCLUDED.private_key,
+                public_key = EXCLUDED.public_key,
+                updated_at = CURRENT_TIMESTAMP
+        ");
         $stmt->execute([
             $this->institutionId,
-            $this->pkeyToBinary($privateBin),
-            $this->pkeyToBinary($publicBin)
+            $privateKeyPem,
+            $publicKeyPem
         ]);
     }
+
 
     /**
      * Sign academic transcript with 2048-bit RSA
